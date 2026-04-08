@@ -11,23 +11,33 @@ Your goal is to:
 - Evaluate what your system gets right and wrong
 - Reflect on how this mirrors real world AI recommenders
 
-Replace this paragraph with your own summary of what your version does.
+This project simulates a content-based music recommender in Python. It scores songs from an 18-song catalog against a user taste profile using genre, mood, energy, valence, and danceability. The goal is to understand how simple scoring rules turn raw data into ranked suggestions and where those rules can go wrong.
 
 ---
 
 ## How The System Works
 
-Explain your design in plain language.
+Real-world music recommenders like Spotify use two main approaches working together. Collaborative filtering looks at what other users with similar taste have listened to and assumes you might like the same things. Content-based filtering looks at the actual properties of songs, like tempo, mood, or energy, and finds songs that are similar to ones you already enjoy. Most production systems blend both approaches to get better results. One known challenge is the cold start problem, where a brand new user has no listening history, so the system has to rely on content-based signals alone until enough data is collected.
 
-Some prompts to answer:
+**Song features used in this simulation:**
 
-- What features does each `Song` use in your system
-  - For example: genre, mood, energy, tempo
-- What information does your `UserProfile` store
-- How does your `Recommender` compute a score for each song
-- How do you choose which songs to recommend
+- genre (categorical)
+- mood (categorical)
+- energy (0.0 to 1.0)
+- valence (0.0 to 1.0)
+- danceability (0.0 to 1.0)
 
-You can include a simple diagram or bullet list if helpful.
+**UserProfile stores:**
+
+- favorite_genre
+- favorite_mood
+- target_energy
+- target_valence
+- target_danceability
+
+**Algorithm recipe:**
+
+The recommender scores each song by comparing it to the user's profile. A genre match adds 2.0 points and a mood match adds 1.0 point. For the numerical features, each one uses proximity scoring: the score is 1 minus the absolute difference between the song's value and the user's target, so songs closer to the user's preference score higher. Energy uses its full proximity score, while valence and danceability are each weighted at 0.5. All of these are summed into a single score for each song, and then songs are ranked from highest to lowest. The top k songs are returned as the final recommendations.
 
 ---
 
@@ -68,25 +78,17 @@ You can add more tests in `tests/test_recommender.py`.
 
 ## Experiments You Tried
 
-Use this section to document the experiments you ran. For example:
-
-- What happened when you changed the weight on genre from 2.0 to 0.5
-- What happened when you added tempo or valence to the score
-- How did your system behave for different types of users
+- Halving the genre match bonus from 2.0 to 1.0 and doubling the energy proximity weight caused Rooftop Lights (indie pop) to rank above Gym Hero (pop) for the Pop Fan profile. A song without a genre match but with stronger energy alignment overtook one that had the genre match. The original weights were restored after the experiment.
+- Running the same catalog against three different profiles (Pop Fan, Lofi Listener, Rock Head) showed that the system works best when the user's preferred genre has multiple songs in the catalog. Rock Head had a near-perfect top result but weak options at positions 2 through 5 because only one rock song exists in the dataset.
 
 ---
 
 ## Limitations and Risks
 
-Summarize some limitations of your recommender.
-
-Examples:
-
-- It only works on a tiny catalog
-- It does not understand lyrics or language
-- It might over favor one genre or mood
-
-You will go deeper on this in your model card.
+- The catalog has only 18 songs so results for underrepresented genres fall back to energy and mood proximity quickly.
+- The genre bonus of 2.0 points is large enough to dominate the score. Songs without a genre match rarely break into the top 2.
+- No diversity logic exists so the same artist can appear multiple times in the top results.
+- The system does not consider tempo, acousticness, or lyrics at all.
 
 ---
 
@@ -96,10 +98,9 @@ Read and complete `model_card.md`:
 
 [**Model Card**](model_card.md)
 
-Write 1 to 2 paragraphs here about what you learned:
+Building this showed how directly scoring weights shape what a user sees. The genre bonus alone was enough to determine the top result in almost every case. Adjusting it by a single point changed the ranking in ways that felt surprising but made complete sense once the math was traced through. Real recommenders are doing the same thing at a much larger scale, which means the biases baked into their weights are just harder to see.
 
-- about how recommenders turn data into predictions
-- about where bias or unfairness could show up in systems like this
+The filter bubble problem is more obvious in a small system like this. When a user's genre dominates the top results, they never see songs from other genres even if those songs match their energy and mood almost perfectly. A real platform running this logic at scale would quietly push users deeper into whatever genre they started with, which is exactly how filter bubbles form.
 
 
 ---
