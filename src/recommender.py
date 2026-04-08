@@ -162,6 +162,27 @@ def score_song_by_mode(user_prefs: Dict, song: Dict, mode: str) -> Tuple[float, 
         return score_song(user_prefs, song)
 
 
+def apply_diversity_penalty(ranked_results: List[Tuple[Dict, float, str]], max_per_artist: int = 2) -> List[Tuple[Dict, float, str]]:
+    """
+    Filters ranked results to limit how many songs from the same artist appear.
+    """
+    artist_counts = {}
+    filtered = []
+
+    for result in ranked_results:
+        song, score, explanation = result
+        artist = song["artist"]
+
+        if artist not in artist_counts:
+            artist_counts[artist] = 0
+
+        if artist_counts[artist] < max_per_artist:
+            filtered.append(result)
+            artist_counts[artist] = artist_counts[artist] + 1
+
+    return filtered
+
+
 def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5, mode: Optional[str] = None) -> List[Tuple[Dict, float, str]]:
     """
     Functional implementation of the recommendation logic.
@@ -179,4 +200,6 @@ def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5, mode: Optio
 
     ranked = sorted(scored_songs, key=lambda x: x[1], reverse=True)
 
-    return ranked[:k]
+    diverse = apply_diversity_penalty(ranked)
+
+    return diverse[:k]
