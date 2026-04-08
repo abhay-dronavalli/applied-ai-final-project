@@ -56,6 +56,8 @@ def load_songs(csv_path: str) -> List[Dict]:
         reader = csv.DictReader(f)
         for row in reader:
             row["id"] = int(row["id"])
+            row["popularity"] = int(row["popularity"])
+            row["release_decade"] = int(row["release_decade"])
             for field in ("energy", "tempo_bpm", "valence", "danceability", "acousticness"):
                 row[field] = float(row[field])
             songs.append(row)
@@ -88,6 +90,18 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     danceability_value = (1.0 - abs(song["danceability"] - user_prefs["target_danceability"])) * 0.5
     score += danceability_value
     reasons.append(f"danceability proximity (+{danceability_value:.2f})")
+
+    popularity_value = (float(song["popularity"]) / 100) * 0.5
+    score += popularity_value
+    reasons.append(f"popularity bonus (+{popularity_value:.2f})")
+
+    if int(song["release_decade"]) == user_prefs.get("preferred_decade", 2020):
+        score += 0.5
+        reasons.append("decade match (+0.5)")
+
+    if song["mood_tag"] == user_prefs.get("preferred_mood_tag", ""):
+        score += 0.75
+        reasons.append("mood tag match (+0.75)")
 
     return (score, reasons)
 
