@@ -105,7 +105,64 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
 
     return (score, reasons)
 
-def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
+def score_song_by_mode(user_prefs: Dict, song: Dict, mode: str) -> Tuple[float, List[str]]:
+    """
+    Scores a single song using one of three named scoring strategies.
+    Falls back to score_song if mode is unrecognized.
+    """
+    score = 0.0
+    reasons = []
+
+    if mode == "genre_first":
+        if song["genre"] == user_prefs["genre"]:
+            score += 3.0
+            reasons.append("genre match (+3.0)")
+
+        if song["mood"] == user_prefs["mood"]:
+            score += 1.0
+            reasons.append("mood match (+1.0)")
+
+        energy_value = (1.0 - abs(song["energy"] - user_prefs["target_energy"])) * 0.5
+        score += energy_value
+        reasons.append(f"energy proximity (+{energy_value:.2f})")
+
+        return (score, reasons)
+
+    elif mode == "energy_focused":
+        energy_value = (1.0 - abs(song["energy"] - user_prefs["target_energy"])) * 3.0
+        score += energy_value
+        reasons.append(f"energy proximity (+{energy_value:.2f})")
+
+        valence_value = (1.0 - abs(song["valence"] - user_prefs["target_valence"])) * 1.5
+        score += valence_value
+        reasons.append(f"valence proximity (+{valence_value:.2f})")
+
+        danceability_value = (1.0 - abs(song["danceability"] - user_prefs["target_danceability"])) * 1.5
+        score += danceability_value
+        reasons.append(f"danceability proximity (+{danceability_value:.2f})")
+
+        return (score, reasons)
+
+    elif mode == "mood_first":
+        if song["mood"] == user_prefs["mood"]:
+            score += 2.0
+            reasons.append("mood match (+2.0)")
+
+        if song["mood_tag"] == user_prefs.get("preferred_mood_tag", ""):
+            score += 1.5
+            reasons.append("mood tag match (+1.5)")
+
+        energy_value = (1.0 - abs(song["energy"] - user_prefs["target_energy"])) * 0.5
+        score += energy_value
+        reasons.append(f"energy proximity (+{energy_value:.2f})")
+
+        return (score, reasons)
+
+    else:
+        return score_song(user_prefs, song)
+
+
+def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5, mode: Optional[str] = None) -> List[Tuple[Dict, float, str]]:
     """
     Functional implementation of the recommendation logic.
     Required by src/main.py
@@ -113,7 +170,10 @@ def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tup
     scored_songs = []
 
     for song in songs:
-        score, reasons = score_song(user_prefs, song)
+        if mode is None:
+            score, reasons = score_song(user_prefs, song)
+        else:
+            score, reasons = score_song_by_mode(user_prefs, song, mode)
         explanation = ", ".join(reasons)
         scored_songs.append((song, score, explanation))
 
