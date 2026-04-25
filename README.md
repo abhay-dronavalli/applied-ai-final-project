@@ -1,212 +1,218 @@
-# 🎵 Music Recommender Simulation
+# VibeFinder: Applied AI Music Recommender
 
-## Project Summary
+## Base Project
 
-In this project you will build and explain a small music recommender system.
-
-Your goal is to:
-
-- Represent songs and a user "taste profile" as data
-- Design a scoring rule that turns that data into recommendations
-- Evaluate what your system gets right and wrong
-- Reflect on how this mirrors real world AI recommenders
-
-This project simulates a content-based music recommender in Python. It scores songs from an 18-song catalog against a user taste profile using genre, mood, energy, valence, and danceability. The goal is to understand how simple scoring rules turn raw data into ranked suggestions and where those rules can go wrong.
+This project extends the AI110 Module 3 Music Recommender Simulation. The original system built a content-based filtering pipeline in Python: it scored songs from an 18-song catalog against a hardcoded user taste profile using weighted features like genre, mood, energy, valence, and danceability. Users were represented as static dicts, the scoring ran once, and the top results were printed to the console. There was no language model involved and no feedback loop.
 
 ---
 
-## How The System Works
+## What's New
 
-Real-world music recommenders like Spotify use two main approaches working together. Collaborative filtering looks at what other users with similar taste have listened to and assumes you might like the same things. Content-based filtering looks at the actual properties of songs, like tempo, mood, or energy, and finds songs that are similar to ones you already enjoy. Most production systems blend both approaches to get better results. One known challenge is the cold start problem, where a brand new user has no listening history, so the system has to rely on content-based signals alone until enough data is collected.
-
-**Song features used in this simulation:**
-
-- genre (categorical)
-- mood (categorical)
-- energy (0.0 to 1.0)
-- valence (0.0 to 1.0)
-- danceability (0.0 to 1.0)
-
-**UserProfile stores:**
-
-- favorite_genre
-- favorite_mood
-- target_energy
-- target_valence
-- target_danceability
-
-**Algorithm recipe:**
-
-The recommender scores each song by comparing it to the user's profile. A genre match adds 2.0 points and a mood match adds 1.0 point. For the numerical features, each one uses proximity scoring: the score is 1 minus the absolute difference between the song's value and the user's target, so songs closer to the user's preference score higher. Energy uses its full proximity score, while valence and danceability are each weighted at 0.5. All of these are summed into a single score for each song, and then songs are ranked from highest to lowest. The top k songs are returned as the final recommendations.
+- **Agentic loop** (plan, act, evaluate, revise) that runs up to 3 iterations before returning final results
+- **LLM integration** via the Anthropic API: Claude Haiku parses a natural language music request into a structured user profile and picks the best scoring mode
+- **Input guardrails** that block empty, too-short, or non-music-related requests before any API call is made
+- **Structured logging** of every step taken, returned alongside the final recommendations
+- **Test harness** (`tests/test_harness.py`) that runs 8 predefined inputs and reports pass/fail results with a summary table
 
 ---
 
-## Getting Started
+## System Architecture
 
-### Setup
+```mermaid
+flowchart TD
+    A([User Input]) --> B{Guardrail Check}
 
-1. Create a virtual environment (optional but recommended):
+    B -- "empty / too short / not music-related" --> C([Early Exit: error message\nresults=[], iterations=0])
+
+    B -- passes --> D[PLAN\ncall claude-haiku-4-5-20251001\nparse JSON profile + scoring_mode]
+
+    D --> E[ACT\ncall recommend_songs\nfrom recommender.py\nreturn top 5 results]
+
+    E --> F[EVALUATE\ndiversity_score = unique genres / 5\navg_score = mean of top-5 scores\nquality_pass = avg >= 1.2 AND diversity >= 0.4]
+
+    F -- "quality_pass = True\nOR iterations = 3" --> G([Final Output\nresults + full agent_log\niterations count\nfinal_profile\nquality dict])
+
+    F -- "quality_pass = False\nAND iterations < 3" --> H[REVISE\nbuild revised prompt with\nfailure reason appended]
+
+    H -- "increment iteration counter" --> D
+
+    style A fill:#4a90d9,color:#fff
+    style C fill:#e05252,color:#fff
+    style D fill:#7b68ee,color:#fff
+    style E fill:#5ba85b,color:#fff
+    style F fill:#e0a030,color:#fff
+    style H fill:#c47a20,color:#fff
+    style G fill:#4a90d9,color:#fff
+```
+
+---
+
+## Setup Instructions
+
+1. Clone the repository:
 
    ```bash
-   python -m venv .venv
-   source .venv/bin/activate      # Mac or Linux
-   .venv\Scripts\activate         # Windows
+   git clone https://github.com/your-username/applied-ai-final-project.git
+   cd applied-ai-final-project
+   ```
 
-2. Install dependencies
+2. Install dependencies:
 
-```bash
-pip install -r requirements.txt
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-3. Run the app:
+3. Set your Anthropic API key. On Windows (PowerShell):
 
-```bash
-python -m src.main
-```
+   ```powershell
+   $env:ANTHROPIC_API_KEY = "your-api-key-here"
+   ```
 
-### Running Tests
+4. Run the agent (interactive CLI):
 
-Run the starter tests with:
+   ```bash
+   python src/agent.py
+   ```
 
-```bash
-pytest
-```
+5. Run the test harness:
 
-You can add more tests in `tests/test_recommender.py`.
-
----
-
-## Experiments You Tried
-
-- Halving the genre match bonus from 2.0 to 1.0 and doubling the energy proximity weight caused Rooftop Lights (indie pop) to rank above Gym Hero (pop) for the Pop Fan profile. A song without a genre match but with stronger energy alignment overtook one that had the genre match. The original weights were restored after the experiment.
-- Running the same catalog against three different profiles (Pop Fan, Lofi Listener, Rock Head) showed that the system works best when the user's preferred genre has multiple songs in the catalog. Rock Head had a near-perfect top result but weak options at positions 2 through 5 because only one rock song exists in the dataset.
+   ```bash
+   python tests/test_harness.py
+   ```
 
 ---
 
-## Limitations and Risks
+## Sample Interactions
 
-- The catalog has only 18 songs so results for underrepresented genres fall back to energy and mood proximity quickly.
-- The genre bonus of 2.0 points is large enough to dominate the score. Songs without a genre match rarely break into the top 2.
-- No diversity logic exists so the same artist can appear multiple times in the top results.
-- The system does not consider tempo, acousticness, or lyrics at all.
+**1. Chill lofi for studying**
+
+```
+$ python src/agent.py
+=== VibeFinder Agent ===
+Describe the music you want: I want chill lofi music with low energy for studying
+
+--- Agent ran 1 iteration(s) ---
+
+[Agent Log]
+  [1] PLAN   -> genre=lofi  mood=chill  energy=0.2  mode=mood_first
+         Reasoning : User explicitly requested chill lofi music for studying, indicating
+                     preference for relaxed atmosphere with minimal energy and
+                     focus-friendly characteristics
+  [1] ACT    -> mode=mood_first, returned 5 songs
+  [1] EVAL   -> avg_score=1.651  diversity=0.6  [PASS]
+
+[Final Recommendations]
+╭──────────────────────────────────┬────────────────┬───────────┬───────╮
+│ Title                            │ Artist         │ Genre     │ Score │
+├──────────────────────────────────┼────────────────┼───────────┼───────┤
+│ Spacewalk Thoughts               │ Orbit Bloom    │ ambient   │  2.46 │
+│ Library Rain                     │ Paper Lanterns │ lofi      │  2.42 │
+│ Midnight Coding                  │ LoRoom         │ lofi      │  2.39 │
+│ Rainy Day Letters                │ Solenne        │ classical │  0.49 │
+│ Moonlight Sonata Reimagined      │ Clara Voss     │ classical │  0.49 │
+╰──────────────────────────────────┴────────────────┴───────────┴───────╯
+
+[Quality]  avg_score=1.651  diversity=0.6  pass=True
+[Final Profile]  genre=lofi  mood=chill  energy=0.2  mode=mood_first
+```
+
+**2. High energy rock for working out**
+
+```
+$ python src/agent.py
+=== VibeFinder Agent ===
+Describe the music you want: high energy rock music for working out
+
+--- Agent ran 1 iteration(s) ---
+
+[Agent Log]
+  [1] PLAN   -> genre=rock  mood=energetic  energy=0.9  mode=energy_focused
+         Reasoning : User explicitly wants high energy rock for working out, so rock
+                     genre with energetic mood and maximum energy level (0.9) is appropriate.
+  [1] ACT    -> mode=energy_focused, returned 5 songs
+  [1] EVAL   -> avg_score=5.136  diversity=0.8  [PASS]
+
+[Final Recommendations]
+╭──────────────────────────┬──────────────┬───────────┬───────╮
+│ Title                    │ Artist       │ Genre     │ Score │
+├──────────────────────────┼──────────────┼───────────┼───────┤
+│ Storm Runner             │ Voltline     │ rock      │  5.70 │
+│ Night Drive Loop         │ Neon Echo    │ synthwave │  5.19 │
+│ Concrete Sunrise         │ K-Flows      │ hip hop   │  4.98 │
+│ Gym Hero                 │ Max Pulse    │ pop       │  4.93 │
+│ Block Party Anthem       │ Crest Wave   │ hip hop   │  4.88 │
+╰──────────────────────────┴──────────────┴───────────┴───────╯
+
+[Quality]  avg_score=5.136  diversity=0.8  pass=True
+[Final Profile]  genre=rock  mood=energetic  energy=0.9  mode=energy_focused
+```
+
+**3. Sad moody slow acoustic (agent revised once)**
+
+```
+$ python src/agent.py
+=== VibeFinder Agent ===
+Describe the music you want: sad and moody music, something slow and acoustic
+
+--- Agent ran 2 iteration(s) ---
+
+[Agent Log]
+  [1] PLAN   -> genre=indie pop  mood=moody  energy=0.2  mode=mood_first
+         Reasoning : Moody indie pop with low energy fits sad and slow acoustic requests.
+  [1] ACT    -> mode=mood_first, returned 5 songs
+  [1] EVAL   -> avg_score=1.198  diversity=0.8  [FAIL]
+  [1] REVISE -> the average recommendation score was too low (1.20, threshold >= 1.2)
+  [2] PLAN   -> genre=indie pop  mood=moody  energy=0.3  mode=mood_first
+         Reasoning : Slightly raising energy to 0.3 to broaden proximity matches
+                     while keeping the mood-first strategy.
+  [2] ACT    -> mode=mood_first, returned 5 songs
+  [2] EVAL   -> avg_score=1.216  diversity=1.0  [PASS]
+
+[Final Recommendations]
+╭──────────────────────────┬────────────────┬───────────┬───────╮
+│ Title                    │ Artist         │ Genre     │ Score │
+├──────────────────────────┼────────────────┼───────────┼───────┤
+│ Late Night Feelings      │ Solenne        │ r&b       │  2.38 │
+│ Night Drive Loop         │ Neon Echo      │ synthwave │  2.27 │
+│ Spacewalk Thoughts       │ Orbit Bloom    │ ambient   │  0.49 │
+│ Library Rain             │ Paper Lanterns │ lofi      │  0.47 │
+│ Coffee Shop Stories      │ Slow Stereo    │ jazz      │  0.46 │
+╰──────────────────────────┴────────────────┴───────────┴───────╯
+
+[Quality]  avg_score=1.216  diversity=1.0  pass=True
+[Final Profile]  genre=indie pop  mood=moody  energy=0.3  mode=mood_first
+```
+
+---
+
+## Design Decisions
+
+**Why agentic over single-pass?** The original system required the developer to define user profiles in code. An agentic loop lets a user describe what they want in plain English and lets the LLM figure out the structured parameters. The evaluate-and-revise loop also means the system can catch low-quality outputs and try again, which a single-pass pipeline cannot do.
+
+**Why Claude Haiku?** This task is structured extraction, not creative generation. Haiku handles JSON parsing from natural language accurately and runs fast. Using Opus or Sonnet for a task this constrained would add cost and latency without any meaningful improvement in output quality.
+
+**Why these quality thresholds?** The initial avg_score threshold was 1.5 but that turned out to be too strict for a small 18-song dataset. With only one rock song and limited genre coverage, cross-genre requests frequently landed below that bar even when the recommendations were reasonable. Lowering it to 1.2 better reflects what "good enough" looks like given the dataset size. The diversity threshold of 0.4 requires at least 2 unique genres in the top 5, which is a meaningful but achievable bar.
+
+**Neutral valence and danceability defaults.** The LLM profile only asks for genre, mood, energy, and scoring mode. The base `score_song()` function also requires `target_valence` and `target_danceability`. Rather than expand the LLM spec or leave those keys missing, the agent fills them with 0.5 (neutral midpoint). This avoids key errors and does not bias results in either direction since most songs cluster near the middle of those ranges anyway.
+
+---
+
+## Testing Summary
+
+The test harness at `tests/test_harness.py` runs 8 predefined inputs covering normal music requests and three guardrail edge cases. All 8 tests passed.
+
+The avg_score threshold was originally 1.5 and was lowered to 1.2 after observing that genre-diverse requests on a small catalog consistently produced reasonable results that still fell below the stricter cutoff. The fix was applied in `src/agent.py` and the harness was updated to match.
+
+All three guardrail cases (empty input, single character, non-music topic) correctly returned `results=[]` and `iterations=0` without making any API calls.
 
 ---
 
 ## Reflection
 
-Read and complete `model_card.md`:
-
-[**Model Card**](model_card.md)
-
-Building this showed how directly scoring weights shape what a user sees. The genre bonus alone was enough to determine the top result in almost every case. Adjusting it by a single point changed the ranking in ways that felt surprising but made complete sense once the math was traced through. Real recommenders are doing the same thing at a much larger scale, which means the biases baked into their weights are just harder to see.
-
-The filter bubble problem is more obvious in a small system like this. When a user's genre dominates the top results, they never see songs from other genres even if those songs match their energy and mood almost perfectly. A real platform running this logic at scale would quietly push users deeper into whatever genre they started with, which is exactly how filter bubbles form.
-
+Building this made it clear how much scaffolding goes into making an LLM actually useful inside a larger system. The language model itself is only one piece. The guardrails, the evaluation logic, and the revise loop are what turn a single API call into something reliable enough to test. The gap between "the LLM returns a JSON object" and "the system behaves consistently" is where most of the real engineering work lives. It also showed that quality thresholds are not obvious up front. The first threshold I picked (1.5) looked reasonable until I ran it against the actual dataset and watched reasonable results get flagged as failures. That kind of calibration only happens through testing.
 
 ---
 
-## 7. `model_card_template.md`
+## Loom Walkthrough
 
-Combines reflection and model card framing from the Module 3 guidance. :contentReference[oaicite:2]{index=2}  
-
-```markdown
-# 🎧 Model Card - Music Recommender Simulation
-
-## 1. Model Name
-
-Give your recommender a name, for example:
-
-> VibeFinder 1.0
-
----
-
-## 2. Intended Use
-
-- What is this system trying to do
-- Who is it for
-
-Example:
-
-> This model suggests 3 to 5 songs from a small catalog based on a user's preferred genre, mood, and energy level. It is for classroom exploration only, not for real users.
-
----
-
-## 3. How It Works (Short Explanation)
-
-Describe your scoring logic in plain language.
-
-- What features of each song does it consider
-- What information about the user does it use
-- How does it turn those into a number
-
-Try to avoid code in this section, treat it like an explanation to a non programmer.
-
----
-
-## 4. Data
-
-Describe your dataset.
-
-- How many songs are in `data/songs.csv`
-- Did you add or remove any songs
-- What kinds of genres or moods are represented
-- Whose taste does this data mostly reflect
-
----
-
-## 5. Strengths
-
-Where does your recommender work well
-
-You can think about:
-- Situations where the top results "felt right"
-- Particular user profiles it served well
-- Simplicity or transparency benefits
-
----
-
-## 6. Limitations and Bias
-
-Where does your recommender struggle
-
-Some prompts:
-- Does it ignore some genres or moods
-- Does it treat all users as if they have the same taste shape
-- Is it biased toward high energy or one genre by default
-- How could this be unfair if used in a real product
-
----
-
-## 7. Evaluation
-
-How did you check your system
-
-Examples:
-- You tried multiple user profiles and wrote down whether the results matched your expectations
-- You compared your simulation to what a real app like Spotify or YouTube tends to recommend
-- You wrote tests for your scoring logic
-
-You do not need a numeric metric, but if you used one, explain what it measures.
-
----
-
-## 8. Future Work
-
-If you had more time, how would you improve this recommender
-
-Examples:
-
-- Add support for multiple users and "group vibe" recommendations
-- Balance diversity of songs instead of always picking the closest match
-- Use more features, like tempo ranges or lyric themes
-
----
-
-## 9. Personal Reflection
-
-A few sentences about what you learned:
-
-- What surprised you about how your system behaved
-- How did building this change how you think about real music recommenders
-- Where do you think human judgment still matters, even if the model seems "smart"
-
+Video walkthrough: [INSERT LOOM LINK]

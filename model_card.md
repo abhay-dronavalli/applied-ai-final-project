@@ -1,53 +1,67 @@
-# 🎧 Model Card: Music Recommender Simulation
+# Model Card: VibeFinder Agent
 
-## 1. Model Name  
+## Intended Use
 
-VibeFinder 1.0
-
----
-
-## 2. Intended Use  
-
-This system suggests up to 5 songs from an 18-song catalog based on a user's preferred genre, mood, energy level, valence, and danceability. It is built for classroom exploration to understand how content-based filtering works. It is not designed for real users or production use.
+VibeFinder is a music recommendation agent built for an AI course final project. It is designed to take a natural language description of what someone wants to listen to, translate that into a structured taste profile using an LLM, and return a ranked list of songs from a curated catalog. The intended audience is students and educators exploring how agentic AI systems work in practice. It is not designed for production use or real user data.
 
 ---
 
-## 3. How the Model Works  
+## Base Model
 
-The recommender compares each song in the catalog to a user profile using five features. Genre and mood are categorical so they either match or they do not. A genre match adds 2.0 points and a mood match adds 1.0 point. Energy, valence, and danceability use proximity scoring where a song closer to the user's target value scores higher. Energy uses its full proximity score (max 1.0), while valence and danceability are each weighted at 0.5. All five components are summed into a final score and songs are ranked highest to lowest.
+**claude-haiku-4-5-20251001** via the Anthropic API.
 
----
-
-## 4. Data  
-
-The catalog has 18 songs covering pop, lofi, rock, ambient, jazz, synthwave, indie pop, hip hop, classical, country, and R&B. Moods include happy, chill, intense, relaxed, focused, moody, energetic, sad, and romantic. The dataset was manually created for this simulation and does not reflect real listening data or user behavior. Sad and melancholic moods are slightly overrepresented in the expanded songs.
+Haiku handles the natural language parsing step: it receives the user's input and returns a JSON object with fields for genre, mood, target energy, acoustic preference, scoring mode, and a brief reasoning string. It is called again during the revise step if the first result set does not meet quality thresholds. All other logic (scoring, diversity filtering, evaluation) is deterministic Python code in `src/recommender.py` and `src/agent.py`.
 
 ---
 
-## 5. Strengths  
+## AI Collaboration
 
-The system works well when a user's preferred genre is present in the catalog and their numerical preferences align with at least one song. Profiles like Lofi Listener and Rock Head get near-perfect top matches because their genres are represented and the song features align closely. The scoring is fully transparent since every recommendation includes a breakdown of exactly why each song scored the way it did.
+Claude Code was used during development as a coding assistant. Two examples stand out.
 
----
+One genuinely helpful suggestion was the try/except import pattern used in both `src/agent.py` and `tests/test_harness.py`. When Python runs a file directly, the working directory affects how module imports resolve. The try/except block that falls back to inserting the project root into `sys.path` was suggested by Claude Code and solved an import error that would have made the CLI and test harness fragile depending on where the user ran the command from.
 
-## 6. Limitations and Bias 
-
-The genre match bonus of 2.0 points dominates the scoring. A song with a perfect genre match will almost always outrank songs without one regardless of how well the other features align. The catalog only has one rock song so Rock Head gets a strong first result but weak fallback options. The system also has no diversity logic so it can surface multiple songs from the same artist back to back. Users whose preferred genre is not in the catalog get no genre bonus at all and the results feel generic.
+One suggestion that needed correction was the initial `avg_score` quality threshold of 1.5. Claude Code proposed this as a reasonable bar for "good" recommendations, but after running the test harness against the actual 18-song dataset it turned out to be too strict. Several clearly reasonable result sets for cross-genre or mood-first requests scored between 1.2 and 1.5 because the catalog is too small to produce strong matches outside a user's primary genre. The threshold was lowered to 1.2 after testing, which better fits the dataset's actual score distribution.
 
 ---
 
-## 7. Evaluation  
+## Limitations and Biases
 
-Three user profiles were tested: Pop Fan, Lofi Listener, and Rock Head. All three returned intuitive top results. One experiment was run where the genre bonus was halved to 1.0 and energy proximity was doubled. This caused Rooftop Lights (indie pop) to jump above Gym Hero (pop) for the Pop Fan profile because its energy alignment was stronger than Gym Hero's genre match under the new weights. The experiment showed how sensitive the ranking order is to weight choices.
+**Small dataset.** The catalog has 18 songs. For underrepresented genres, the agent runs out of strong matches quickly and fills the bottom of the top-5 with songs that are only loosely relevant. This is a dataset problem, not a model problem, but it directly affects output quality.
+
+**Genre imbalance.** Rock has one song in the catalog. Any user who asks for rock music will get that one song as the top result and then a drop-off into unrelated genres at positions 2 through 5. The same applies to ambient, jazz, synthwave, and indie pop, each of which has only one representative.
+
+**Hardcoded neutral defaults.** The agent fills `target_valence` and `target_danceability` with 0.5 because the LLM profile spec does not include those fields. This avoids key errors but means the scoring for those two features is the same for every user, regardless of what they actually described.
+
+**Filter bubble risk.** The `genre_first` scoring mode boosts genre match to 3.0 points. When the LLM selects this mode for a single-genre request, the top results are almost entirely from that one genre. Users never see songs from other genres that might match their energy or mood well. This is the same filter bubble dynamic that real recommenders produce at scale.
 
 ---
 
-## 8. Future Work  
+## Guardrails and Reliability
 
-Adding more songs per genre would reduce the fallback problem for underrepresented genres like rock. A diversity penalty that limits how many songs from the same artist can appear in the top results would make recommendations feel less repetitive. Supporting multi-feature mood tags instead of a single mood string would let the system handle more nuanced taste profiles.
+Three input guardrails block requests before any API call is made:
+
+1. Empty or whitespace-only input
+2. Input shorter than 5 characters
+3. Input with no recognizable music-related words (checked against a keyword list of all valid genres, moods, and general music terms)
+
+The agent also runs a quality evaluation after every ACT step. If the result set's average score is below 1.2 or genre diversity is below 0.4 (fewer than 2 unique genres in the top 5), the agent builds a revised prompt that describes the specific failure and calls the LLM again. This loop runs up to 3 times before the agent returns whatever it has. Every step is logged and included in the return value so the caller can inspect exactly what happened.
 
 ---
 
-## 9. Personal Reflection  
+## Future Improvements
 
-Building this made it clear how much a simple number like a genre bonus shapes everything downstream. Changing one weight by 1.0 point reshuffled the rankings in ways that felt arbitrary but were completely logical given the math. Real recommenders like Spotify are doing something structurally similar but with thousands of features and millions of data points, which makes it harder to see why any single recommendation happened. The most surprising thing was how confident the system feels even with only 18 songs and 5 features. It always returns an answer, even when that answer is not actually a good match.
+**Larger and more balanced dataset.** Adding 5 to 10 songs per genre would immediately improve result quality for underrepresented genres and make the diversity threshold more meaningful.
+
+**User feedback loop.** Right now the agent has no way to learn which recommendations a user liked or skipped. Even a simple thumbs up/down signal per session could be used to adjust weights in a follow-up query.
+
+**Expose valence and danceability to the LLM.** Including these two fields in the LLM profile spec would let users say things like "I want something you can dance to" or "something atmospheric and still" and have that actually affect the scoring. Right now those signals are ignored.
+
+**RAG for artist and genre context.** Attaching a retrieval step that pulls in short descriptions of genres or artists before the LLM plans the profile could help the model make better decisions for vague requests like "something like a Sunday morning" or "music that feels like a road trip."
+
+---
+
+## Testing Results
+
+The test harness at `tests/test_harness.py` defines 8 test cases: 5 normal music requests expected to pass quality checks and 3 guardrail edge cases expected to block. All 8 passed.
+
+The avg_score threshold was originally set at 1.5 and was lowered to 1.2 during testing. The change was made after observing that cross-genre and mood-first requests on the small catalog produced reasonable recommendations that consistently fell below the stricter threshold. Lowering it brought the harness into alignment with what the dataset can actually deliver.
