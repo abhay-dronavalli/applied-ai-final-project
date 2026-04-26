@@ -13,6 +13,9 @@ This project extends the AI110 Module 3 Music Recommender Simulation. The origin
 - **Input guardrails** that block empty, too-short, or non-music-related requests before any API call is made
 - **Structured logging** of every step taken, returned alongside the final recommendations
 - **Test harness** (`tests/test_harness.py`) that runs 8 predefined inputs and reports pass/fail results with a summary table
+- **RAG retrieval**: before planning, the agent retrieves relevant genre and mood context from a local knowledge base of 12 documents and injects it into the LLM prompt
+- **Personality modes**: three selectable modes (hype_coach, late_night_dj, study_guide) that measurably change genre selection, energy target, scoring mode, and reasoning tone
+- **Demonstrated output difference**: the same input "give me something good" produced energy=0.9 with hype_coach vs energy=0.3 with study_guide
 
 ---
 
@@ -72,6 +75,17 @@ flowchart TD
 
    ```bash
    python src/agent.py
+   ```
+
+   The agent will prompt you to select a personality mode before asking for your music request:
+
+   ```
+   Personality modes:
+     1. hype_coach    - High energy workout hype
+     2. late_night_dj - Moody atmospheric midnight session
+     3. study_guide   - Distraction-free focus playlist
+     0. Default (no personality)
+   Choose a mode (0-3):
    ```
 
 5. Run the test harness:
@@ -185,6 +199,20 @@ Describe the music you want: sad and moody music, something slow and acoustic
 
 ---
 
+## Personality Modes
+
+Three selectable personas each override the LLM's system prompt to bias genre, energy, and scoring mode in a specific direction. When a personality is selected, the guardrail check is also skipped since the persona itself provides musical context.
+
+| Mode | Description | Typical Energy | Scoring Mode |
+|---|---|---|---|
+| `hype_coach` | Maximum energy workout fuel | ~0.9 | energy_focused |
+| `late_night_dj` | Moody atmospheric midnight session | ~0.45 | mood_first |
+| `study_guide` | Distraction-free focus playlist | ~0.3 | genre_first |
+
+The same vague input ("give me something good") returned different results for each mode: hype_coach selected rock at energy=0.9, study_guide selected lofi at energy=0.3. The personality prompt is appended to the base system prompt so the JSON output format stays consistent across all modes.
+
+---
+
 ## Design Decisions
 
 **Why agentic over single-pass?** The original system required the developer to define user profiles in code. An agentic loop lets a user describe what they want in plain English and lets the LLM figure out the structured parameters. The evaluate-and-revise loop also means the system can catch low-quality outputs and try again, which a single-pass pipeline cannot do.
@@ -193,13 +221,15 @@ Describe the music you want: sad and moody music, something slow and acoustic
 
 **Why these quality thresholds?** The initial avg_score threshold was 1.5 but that turned out to be too strict for a small 18-song dataset. With only one rock song and limited genre coverage, cross-genre requests frequently landed below that bar even when the recommendations were reasonable. Lowering it to 1.2 better reflects what "good enough" looks like given the dataset size. The diversity threshold of 0.4 requires at least 2 unique genres in the top 5, which is a meaningful but achievable bar.
 
+**Why RAG before the plan step?** The LLM makes better genre and mode decisions when it has concrete facts about what a genre sounds like rather than relying purely on its training data. A request like "something for late night coding" is vague enough that the LLM could reasonably pick lofi, ambient, synthwave, or jazz. Injecting the knowledge base descriptions before the plan call narrows that ambiguity. In testing, adding RAG context raised the avg_score for the lofi studying request from 1.651 to 2.879 on the same input, a 74% improvement in recommendation score without changing any scoring weights.
+
 **Neutral valence and danceability defaults.** The LLM profile only asks for genre, mood, energy, and scoring mode. The base `score_song()` function also requires `target_valence` and `target_danceability`. Rather than expand the LLM spec or leave those keys missing, the agent fills them with 0.5 (neutral midpoint). This avoids key errors and does not bias results in either direction since most songs cluster near the middle of those ranges anyway.
 
 ---
 
 ## Testing Summary
 
-The test harness at `tests/test_harness.py` runs 8 predefined inputs covering normal music requests and three guardrail edge cases. All 8 tests passed.
+The test harness at `tests/test_harness.py` runs 8 predefined inputs covering normal music requests and three guardrail edge cases. All 8 tests passed, and the harness continues to pass 8/8 after the RAG retrieval and personality mode additions.
 
 The avg_score threshold was originally 1.5 and was lowered to 1.2 after observing that genre-diverse requests on a small catalog consistently produced reasonable results that still fell below the stricter cutoff. The fix was applied in `src/agent.py` and the harness was updated to match.
 

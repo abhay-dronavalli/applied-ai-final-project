@@ -2,7 +2,7 @@
 
 ## Intended Use
 
-VibeFinder is a music recommendation agent built for an AI course final project. It is designed to take a natural language description of what someone wants to listen to, translate that into a structured taste profile using an LLM, and return a ranked list of songs from a curated catalog. The intended audience is students and educators exploring how agentic AI systems work in practice. It is not designed for production use or real user data.
+VibeFinder is a music recommendation agent built for an AI course final project. It takes a natural language description of what someone wants to listen to, retrieves relevant genre and mood context from a local knowledge base using RAG, translates that into a structured taste profile using an LLM, and returns a ranked list of songs from a curated catalog. Users can also select from three personality modes (hype_coach, late_night_dj, study_guide) that bias the LLM toward specific energy ranges, genres, and scoring strategies. The intended audience is students and educators exploring how agentic AI systems work in practice. It is not designed for production use or real user data.
 
 ---
 
@@ -20,6 +20,8 @@ Claude Code was used during development as a coding assistant. Two examples stan
 
 One genuinely helpful suggestion was the try/except import pattern used in both `src/agent.py` and `tests/test_harness.py`. When Python runs a file directly, the working directory affects how module imports resolve. The try/except block that falls back to inserting the project root into `sys.path` was suggested by Claude Code and solved an import error that would have made the CLI and test harness fragile depending on where the user ran the command from.
 
+A second helpful suggestion was the numbered menu for personality selection in the CLI. The original implementation required users to type the full mode name (hype_coach, late_night_dj, study_guide), which is easy to mistype. Claude Code suggested mapping number keys to mode names with a dict lookup, which made the interface cleaner and eliminated invalid-input errors with no extra validation code needed.
+
 One suggestion that needed correction was the initial `avg_score` quality threshold of 1.5. Claude Code proposed this as a reasonable bar for "good" recommendations, but after running the test harness against the actual 18-song dataset it turned out to be too strict. Several clearly reasonable result sets for cross-genre or mood-first requests scored between 1.2 and 1.5 because the catalog is too small to produce strong matches outside a user's primary genre. The threshold was lowered to 1.2 after testing, which better fits the dataset's actual score distribution.
 
 ---
@@ -33,6 +35,8 @@ One suggestion that needed correction was the initial `avg_score` quality thresh
 **Hardcoded neutral defaults.** The agent fills `target_valence` and `target_danceability` with 0.5 because the LLM profile spec does not include those fields. This avoids key errors but means the scoring for those two features is the same for every user, regardless of what they actually described.
 
 **Filter bubble risk.** The `genre_first` scoring mode boosts genre match to 3.0 points. When the LLM selects this mode for a single-genre request, the top results are almost entirely from that one genre. Users never see songs from other genres that might match their energy or mood well. This is the same filter bubble dynamic that real recommenders produce at scale.
+
+**Personality modes amplify filter bubbles.** The hype_coach personality will almost always steer toward high-energy songs with energy_focused mode, regardless of what the catalog diversity looks like. A user who selects hype_coach and gets five high-energy tracks from three genres has no way to know they are being filtered into a narrow slice of the catalog. The personality provides a useful signal but it actively overrides the diversity logic that the evaluation step is supposed to catch.
 
 ---
 
@@ -56,7 +60,11 @@ The agent also runs a quality evaluation after every ACT step. If the result set
 
 **Expose valence and danceability to the LLM.** Including these two fields in the LLM profile spec would let users say things like "I want something you can dance to" or "something atmospheric and still" and have that actually affect the scoring. Right now those signals are ignored.
 
-**RAG for artist and genre context.** Attaching a retrieval step that pulls in short descriptions of genres or artists before the LLM plans the profile could help the model make better decisions for vague requests like "something like a Sunday morning" or "music that feels like a road trip."
+**RAG for artist and genre context.** This is now implemented via `src/rag.py` and a 12-document knowledge base. The next step would be expanding the knowledge base to include artist-level descriptions and cross-genre recommendation logic.
+
+**Personality mode web UI.** Right now personality selection is a CLI numbered menu. Exposing it as a dropdown in a Streamlit or web interface would make the feature more accessible and easier to demonstrate.
+
+**More personality types and custom personalities.** The current three modes cover workout, late night, and study use cases. Adding types like morning_commute, party_host, or wind_down would cover more listener situations. Allowing users to write their own personality description in a text field would make the system genuinely personalizable.
 
 ---
 
