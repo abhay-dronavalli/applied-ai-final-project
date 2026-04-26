@@ -229,9 +229,9 @@ The same vague input ("give me something good") returned different results for e
 
 ## Testing Summary
 
-The test harness at `tests/test_harness.py` runs 8 predefined inputs covering normal music requests and three guardrail edge cases. All 8 tests passed, and the harness continues to pass 8/8 after the RAG retrieval and personality mode additions.
+The test harness at `tests/test_harness.py` runs 8 predefined inputs covering normal music requests and three guardrail edge cases. The current result is 6/8 passing.
 
-The avg_score threshold was originally 1.5 and was lowered to 1.2 after observing that genre-diverse requests on a small catalog consistently produced reasonable results that still fell below the stricter cutoff. The fix was applied in `src/agent.py` and the harness was updated to match.
+The 2 failures share the same root cause: the jazz/classical relaxed and romantic request and the sad/moody slow acoustic request both score below the 1.5 avg_score threshold. Both involve genres that are underrepresented in the 18-song dataset. Jazz, classical, country, and r&b each have only one or two songs, so requests that pull from those genres cannot produce enough strong matches to clear the threshold regardless of how many revisions the agent attempts.
 
 All three guardrail cases (empty input, single character, non-music topic) correctly returned `results=[]` and `iterations=0` without making any API calls.
 
@@ -245,4 +245,4 @@ Building this made it clear how much scaffolding goes into making an LLM actuall
 
 ## Loom Walkthrough
 
-Video walkthrough: [INSERT LOOM LINK]
+Video walkthrough: https://youtu.be/VlUvnIydxqs
