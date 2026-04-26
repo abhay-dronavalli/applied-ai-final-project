@@ -24,21 +24,13 @@ This project extends the AI110 Module 3 Music Recommender Simulation. The origin
 ```mermaid
 flowchart TD
     A([User Input]) --> B{Guardrail Check}
-
-    B -- "empty / too short / not music-related" --> C([Early Exit: error message\nresults=[], iterations=0])
-
-    B -- passes --> D[PLAN\ncall claude-haiku-4-5-20251001\nparse JSON profile + scoring_mode]
-
-    D --> E[ACT\ncall recommend_songs\nfrom recommender.py\nreturn top 5 results]
-
-    E --> F[EVALUATE\ndiversity_score = unique genres / 5\navg_score = mean of top-5 scores\nquality_pass = avg >= 1.2 AND diversity >= 0.4]
-
-    F -- "quality_pass = True\nOR iterations = 3" --> G([Final Output\nresults + full agent_log\niterations count\nfinal_profile\nquality dict])
-
+    B -- "empty / too short / not music-related" --> C([Early Exit\nresults=[], iterations=0])
+    B -- passes --> D[PLAN\ncall claude-haiku\nparse JSON profile + scoring_mode]
+    D --> E[ACT\ncall recommend_songs\nreturn top 5 results]
+    E --> F[EVALUATE\ndiversity_score = unique genres / 5\navg_score = mean of top-5 scores\nquality_pass = avg >= 1.5 AND diversity >= 0.4]
+    F -- "quality_pass = True\nOR iterations = 3" --> G([Final Output\nresults + full agent_log\niterations count])
     F -- "quality_pass = False\nAND iterations < 3" --> H[REVISE\nbuild revised prompt with\nfailure reason appended]
-
     H -- "increment iteration counter" --> D
-
     style A fill:#4a90d9,color:#fff
     style C fill:#e05252,color:#fff
     style D fill:#7b68ee,color:#fff
