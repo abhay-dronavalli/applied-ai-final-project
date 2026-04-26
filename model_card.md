@@ -48,7 +48,11 @@ Three input guardrails block requests before any API call is made:
 2. Input shorter than 5 characters
 3. Input with no recognizable music-related words (checked against a keyword list of all valid genres, moods, and general music terms)
 
-The agent also runs a quality evaluation after every ACT step. If the result set's average score is below 1.2 or genre diversity is below 0.4 (fewer than 2 unique genres in the top 5), the agent builds a revised prompt that describes the specific failure and calls the LLM again. This loop runs up to 3 times before the agent returns whatever it has. Every step is logged and included in the return value so the caller can inspect exactly what happened.
+The agent also runs a quality evaluation after every ACT step. If the result set's average score is below 1.5 or genre diversity is below 0.4 (fewer than 2 unique genres in the top 5), the agent builds a revised prompt that describes the specific failure and calls the LLM again. This loop runs up to 3 times before the agent returns whatever it has. Every step is logged and included in the return value so the caller can inspect exactly what happened.
+
+The system could be misused to generate large volumes of API calls by looping requests programmatically, which would run up Anthropic API costs. The max 3 iteration cap and input guardrails limit this somewhat. A production version would need rate limiting and API key authentication to prevent abuse. The system does not collect or store any user data so there is no privacy misuse risk in its current form.
+
+The most surprising finding during testing was how consistently the LLM chose mood_first mode for emotional requests like sad or romantic, even when genre_first would have produced higher scores. The LLM was optimizing for what felt semantically correct rather than what would score well numerically. This revealed a mismatch between the LLM's natural language reasoning and the scoring system's reward structure, which is a real challenge in agentic AI design.
 
 ---
 
@@ -70,6 +74,4 @@ The agent also runs a quality evaluation after every ACT step. If the result set
 
 ## Testing Results
 
-The test harness at `tests/test_harness.py` defines 8 test cases: 5 normal music requests expected to pass quality checks and 3 guardrail edge cases expected to block. All 8 passed.
-
-The avg_score threshold was originally set at 1.5 and was lowered to 1.2 during testing. The change was made after observing that cross-genre and mood-first requests on the small catalog produced reasonable recommendations that consistently fell below the stricter threshold. Lowering it brought the harness into alignment with what the dataset can actually deliver.
+The test harness at `tests/test_harness.py` defines 8 test cases: 5 normal music requests expected to pass quality checks and 3 guardrail edge cases expected to block. 6 out of 8 passed. The two failures were the jazz/classical romantic request and the sad/moody acoustic request, both of which consistently scored below the 1.5 threshold due to underrepresented genres in the 18-song dataset. Both ran the full 3 iterations without passing. This is a known dataset limitation documented in the Limitations section.
