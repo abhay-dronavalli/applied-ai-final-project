@@ -1,0 +1,26 @@
+[happy]
+Happy music sits at high valence and moderate to high energy, characterized by major keys, upbeat tempos, and arrangements that feel open and bright. It pairs most naturally with pop, indie pop, and upbeat hip hop, and fits situations like morning routines, social gatherings, or any moment where the listener wants to elevate their mood.
+
+[chill]
+Chill music occupies a low to moderate energy range with a relaxed, unhurried feel that does not demand attention. It pairs best with lofi, ambient, and jazz, and is the default mood for studying, casual background listening, or winding down after a long day.
+
+[intense]
+Intense music carries high energy and high arousal, often with aggressive dynamics, fast tempos, or heavy instrumentation that creates a sense of urgency or power. It pairs most strongly with rock and high-energy hip hop, and fits workouts, competitive gaming, or any activity that benefits from a physical energy boost.
+
+[relaxed]
+Relaxed music has low energy and low arousal, moving slowly and smoothly without sharp dynamic shifts or driving rhythms. It pairs well with jazz, classical, and ambient, and is suited to evenings at home, reading, yoga, or any context where the listener wants to settle rather than stimulate.
+
+[focused]
+Focused music sits at low to moderate energy with minimal variation, designed to occupy the background without pulling attention away from the task at hand. It pairs best with lofi, classical, and ambient, and works well for deep work sessions, studying, writing, or any sustained cognitive task.
+
+[moody]
+Moody music sits at medium energy with emotional ambiguity, often carrying a sense of introspection, longing, or tension that does not resolve cleanly into happy or sad. It pairs well with synthwave, r&b, and indie pop, and fits late evenings, creative work, or moments when the listener wants music that matches a complex emotional state.
+
+[energetic]
+Energetic music has high energy and high tempo designed to raise arousal and physical engagement, with driving rhythms and production choices that push the listener forward. It pairs most strongly with pop, rock, and hip hop, and is the right choice for workouts, dancing, commutes, or any situation that calls for momentum.
+
+[sad]
+Sad music has low energy and low valence, using minor keys, slow tempos, and sparse or heavy arrangements to evoke grief, loss, or longing. It pairs most naturally with classical, r&b, and country, and fits moments of processing difficult emotions, quiet evenings alone, or any time the listener wants music that meets them where they are.
+
+[romantic]
+Romantic music sits at low to moderate energy with warm, smooth production and an emotional intimacy that feels personal and direct. It pairs best with r&b, jazz, and country, and is most at home during dinners, late evenings with someone, or any situation where softness and emotional presence are the goal.
