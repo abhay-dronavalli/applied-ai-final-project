@@ -8,10 +8,12 @@ from tabulate import tabulate
 try:
     from src.recommender import load_songs, recommend_songs
     from src.rag import retrieve_context
+    from src.spotify import build_spotify_playlist, display_playlist
 except ModuleNotFoundError:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from src.recommender import load_songs, recommend_songs
     from src.rag import retrieve_context
+    from src.spotify import build_spotify_playlist, display_playlist
 
 _DATA_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -395,3 +397,14 @@ if __name__ == "__main__":
             f"energy={fp['target_energy']}  mode={fp['scoring_mode']}"
         )
         print(f"  Reasoning : {fp.get('reasoning', '')}")
+
+    # ── Spotify playlist preview ──────────────────────────────────────────────
+    print("\n[Spotify Playlist Preview]")
+    if os.environ.get("SPOTIFY_CLIENT_ID") and os.environ.get("SPOTIFY_CLIENT_SECRET"):
+        try:
+            playlist = build_spotify_playlist(output["results"])
+            display_playlist(playlist)
+        except Exception as exc:
+            print(f"  Spotify preview failed: {exc}")
+    else:
+        print("  [Spotify] Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to enable playlist preview")
