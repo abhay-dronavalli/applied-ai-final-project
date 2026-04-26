@@ -34,7 +34,7 @@ VALID_MODES = {"genre_first", "energy_focused", "mood_first"}
 
 # ── Tuneable operational constants ────────────────────────────────────────────
 MAX_ITERATIONS           = 3
-QUALITY_SCORE_THRESHOLD  = 1.2
+QUALITY_SCORE_THRESHOLD  = 1.5
 QUALITY_DIVERSITY_THRESHOLD = 0.4
 CONTEXT_PREVIEW_LENGTH   = 200
 
