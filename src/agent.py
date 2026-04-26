@@ -32,6 +32,12 @@ VALID_MOODS = {
 }
 VALID_MODES = {"genre_first", "energy_focused", "mood_first"}
 
+# ── Tuneable operational constants ────────────────────────────────────────────
+MAX_ITERATIONS           = 3
+QUALITY_SCORE_THRESHOLD  = 1.2
+QUALITY_DIVERSITY_THRESHOLD = 0.4
+CONTEXT_PREVIEW_LENGTH   = 200
+
 PERSONALITY_PROMPTS = {
     "hype_coach": (
         "You are an aggressive hype coach building a workout playlist. "
@@ -148,14 +154,14 @@ def _evaluate(results: list) -> dict:
 
     diversity_score = unique genres / 5
     avg_score       = mean recommendation score
-    quality_pass    = True if avg_score >= 1.2 AND diversity_score >= 0.4
+    quality_pass    = True if avg_score >= QUALITY_SCORE_THRESHOLD AND diversity_score >= QUALITY_DIVERSITY_THRESHOLD
     """
     if not results:
         return {"diversity_score": 0.0, "avg_score": 0.0, "quality_pass": False}
     unique_genres = len({song["genre"] for song, _, _ in results})
     diversity_score = unique_genres / 5
     avg_score = sum(sc for _, sc, _ in results) / len(results)
-    quality_pass = avg_score >= 1.2 and diversity_score >= 0.4
+    quality_pass = avg_score >= QUALITY_SCORE_THRESHOLD and diversity_score >= QUALITY_DIVERSITY_THRESHOLD
     return {
         "diversity_score": round(diversity_score, 3),
         "avg_score": round(avg_score, 3),
@@ -207,13 +213,20 @@ def run_agent(user_input: str, personality: str = None) -> dict:
     client = anthropic.Anthropic(api_key=api_key)
     songs = load_songs(_DATA_PATH)
 
-    rag_context = retrieve_context(user_input)
+    _PERSONALITY_RAG_HINTS = {
+        "hype_coach":    " rock pop energetic",
+        "late_night_dj": " synthwave lofi ambient moody",
+        "study_guide":   " lofi classical ambient focused",
+    }
+    rag_query = user_input + _PERSONALITY_RAG_HINTS.get(personality or "", "")
+    rag_context = retrieve_context(rag_query)
 
     agent_log = []
     agent_log.append({
         "iteration": 0,
         "step": "retrieve",
-        "context_preview": rag_context[:200],
+        "rag_query": rag_query,
+        "context_preview": rag_context[:CONTEXT_PREVIEW_LENGTH],
     })
     if personality and personality in PERSONALITY_PROMPTS:
         agent_log.append({"step": "personality", "mode": personality})
@@ -223,7 +236,7 @@ def run_agent(user_input: str, personality: str = None) -> dict:
     quality = None
     current_prompt = user_input
 
-    while iterations < 3:
+    while iterations < MAX_ITERATIONS:
         iterations += 1
 
         # ── STEP 1: PLAN ──────────────────────────────────────────────────────
@@ -264,20 +277,20 @@ def run_agent(user_input: str, personality: str = None) -> dict:
         if quality["quality_pass"]:
             break
 
-        if iterations >= 3:
+        if iterations >= MAX_ITERATIONS:
             break
 
         # ── STEP 4: REVISE ────────────────────────────────────────────────────
         issues = []
-        if quality["avg_score"] < 1.5:
+        if quality["avg_score"] < QUALITY_SCORE_THRESHOLD:
             issues.append(
                 f"the average recommendation score was too low "
-                f"({quality['avg_score']:.2f}, threshold >= 1.5)"
+                f"({quality['avg_score']:.2f}, threshold >= {QUALITY_SCORE_THRESHOLD})"
             )
-        if quality["diversity_score"] < 0.4:
+        if quality["diversity_score"] < QUALITY_DIVERSITY_THRESHOLD:
             issues.append(
                 f"genre diversity was too low "
-                f"({quality['diversity_score']:.2f}, threshold >= 0.4)"
+                f"({quality['diversity_score']:.2f}, threshold >= {QUALITY_DIVERSITY_THRESHOLD})"
             )
         revise_note = (
             "The previous profile did not meet quality requirements: "
@@ -399,12 +412,13 @@ if __name__ == "__main__":
         print(f"  Reasoning : {fp.get('reasoning', '')}")
 
     # ── Spotify playlist preview ──────────────────────────────────────────────
-    print("\n[Spotify Playlist Preview]")
-    if os.environ.get("SPOTIFY_CLIENT_ID") and os.environ.get("SPOTIFY_CLIENT_SECRET"):
-        try:
-            playlist = build_spotify_playlist(output["results"])
-            display_playlist(playlist)
-        except Exception as exc:
-            print(f"  Spotify preview failed: {exc}")
-    else:
-        print("  [Spotify] Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to enable playlist preview")
+    if output["results"]:
+        print("\n[Spotify Playlist Preview]")
+        if os.environ.get("SPOTIFY_CLIENT_ID") and os.environ.get("SPOTIFY_CLIENT_SECRET"):
+            try:
+                playlist = build_spotify_playlist(output["results"])
+                display_playlist(playlist)
+            except Exception as exc:
+                print(f"  Spotify preview failed: {exc}")
+        else:
+            print("  [Spotify] Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to enable playlist preview")

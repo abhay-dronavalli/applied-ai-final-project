@@ -28,14 +28,16 @@ _DEFAULT_GENRES = ["lofi.txt", "pop.txt", "ambient.txt"]
 
 
 def _detect_genres(text: str) -> list:
-    """Return file names for every genre keyword found in text (lowercased)."""
-    found = []
+    """Return file names for every genre keyword found in text, ordered by position in text."""
+    matches = []
     seen_files = set()
     for genre_name, filename in _GENRE_FILE_MAP.items():
-        if genre_name in text and filename not in seen_files:
-            found.append(filename)
+        pos = text.find(genre_name)
+        if pos != -1 and filename not in seen_files:
+            matches.append((pos, filename))
             seen_files.add(filename)
-    return found
+    matches.sort(key=lambda x: x[0])
+    return [filename for _, filename in matches]
 
 
 def _detect_mood(text: str) -> str:
